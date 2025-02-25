@@ -5,20 +5,21 @@ from typing import List
 
 app = FastAPI()
 
-# Load quantized model at startup to squeeze into 512MB
+# Load smaller, quantized model
 try:
-    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5p-220m")
+    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5p-110m-py")
     model = T5ForConditionalGeneration.from_pretrained(
-        "Salesforce/codet5p-220m",
+        "Salesforce/codet5p-110m-py",
         torch_dtype=torch.float16,  # Half-precision
-        load_in_4bit=True,  # 4-bit quantization to reduce memory
-        device_map="auto"  # Auto-select CPU (Render free has no GPU)
+        load_in_8bit=True,  # 8-bit (more stable than 4-bit on CPU)
+        device_map="auto"  # CPU-only
     )
-    device = torch.device("cpu")  # Force CPU
+    device = torch.device("cpu")
     model.to(device)
     print("Model loaded on:", device)
 except Exception as e:
     print(f"Model loading failed: {e}")
+    model = None  # Fallback if loading fails
 
 @app.post("/rewrite")
 async def rewrite_code(
@@ -27,6 +28,8 @@ async def rewrite_code(
 ):
     if not files:
         return {"error": "No files uploaded"}
+    if model is None:
+        return {"error": "Model failed to load, service unavailable"}
 
     results = []
     for file in files:
@@ -39,7 +42,7 @@ async def rewrite_code(
             outputs = model.generate(
                 inputs["input_ids"],
                 max_length=512,
-                num_beams=4,
+                num_beams=2,  # Lower beams to save memory
                 early_stopping=True
             )
             rewritten = tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -51,4 +54,4 @@ async def rewrite_code(
 
 @app.get("/")
 async def root():
-    return {"message": "CodeT5+ server running"}
+    return {"message": "CodeT5+ server running" if model else "Server running, but model failed to load"}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minecraft Mod Rewriter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        textarea, input[type="text"] { width: 100%; margin: 10px 0; }
+        #output { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Minecraft Mod Rewriter</h1>
+    <p>Type a prompt and upload Java files:</p>
+    <input type="text" id="prompt" placeholder="e.g., Rewrite this Java code for Minecraft 1.20.1 compatibility:">
+    <input type="file" id="files" multiple accept=".java">
+    <button onclick="rewriteCode()">Process Files</button>
+    <h3>Results:</h3>
+    <div id="output"></div>
+
+    <script>
+        async function rewriteCode() {
+            const prompt = document.getElementById("prompt").value;
+            const files = document.getElementById("files").files;
+            const outputDiv = document.getElementById("output");
+            outputDiv.textContent = "Processing...";
+
+            if (files.length === 0) {
+                outputDiv.textContent = "Please upload at least one file.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("prompt", prompt || "Rewrite this Java code for Minecraft 1.20.1 compatibility: ");
+            for (const file of files) {
+                formData.append("files", file);
+            }
+
+            try {
+                const response = await fetch("https://your-render-app.onrender.com/rewrite", {  // Replace with your Render URL
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    let output = "";
+                    data.results.forEach(result => {
+                        output += `File: ${result.filename}\nOriginal:\n${result.original}\nRewritten:\n${result.rewritten}\n\n`;
+                    });
+                    outputDiv.textContent = output;
+                } else {
+                    outputDiv.textContent = `Error: ${data.error || data.detail}`;
+                }
+            } catch (error) {
+                outputDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
