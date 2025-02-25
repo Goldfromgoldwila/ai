@@ -7,11 +7,11 @@ app = FastAPI()
 
 # Load smaller, quantized model
 try:
-    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5p-110m-py")
+    tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small")
     model = T5ForConditionalGeneration.from_pretrained(
-        "Salesforce/codet5p-110m-py",
+        "Salesforce/codet5-small",
         torch_dtype=torch.float16,  # Half-precision
-        load_in_8bit=True,  # 8-bit (more stable than 4-bit on CPU)
+        load_in_8bit=True,  # 8-bit quantization
         device_map="auto"  # CPU-only
     )
     device = torch.device("cpu")
@@ -19,7 +19,7 @@ try:
     print("Model loaded on:", device)
 except Exception as e:
     print(f"Model loading failed: {e}")
-    model = None  # Fallback if loading fails
+    model = None
 
 @app.post("/rewrite")
 async def rewrite_code(

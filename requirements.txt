@@ -3,3 +3,4 @@ uvicorn==0.30.6
 transformers==4.44.2
 torch==2.4.1
 bitsandbytes==0.43.3
+python-multipart==0.0.12
