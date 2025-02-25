@@ -24,11 +24,17 @@
             const files = document.getElementById("files").files;
             const outputDiv = document.getElementById("output");
             outputDiv.textContent = "Processing...";
+            console.log("Starting rewrite process...");
 
             if (files.length === 0) {
                 outputDiv.textContent = "Please upload at least one file.";
+                console.error("No files uploaded.");
                 return;
             }
+
+            // Log the prompt and file details
+            console.log("Prompt:", prompt || "Default prompt used");
+            console.log("Files selected:", Array.from(files).map(f => f.name));
 
             const formData = new FormData();
             formData.append("prompt", prompt || "Rewrite this Java code for Minecraft 1.20.1 compatibility: ");
@@ -37,11 +43,14 @@
             }
 
             try {
-                const response = await fetch("https://your-render-app.onrender.com/rewrite", {  // Replace with your Render URL
+                console.log("Sending request to https://ai-1rxu.onrender.com/rewrite");
+                const response = await fetch("https://ai-1rxu.onrender.com/rewrite", {
                     method: "POST",
                     body: formData
                 });
+
                 const data = await response.json();
+                console.log("Response received:", data);
 
                 if (response.ok) {
                     let output = "";
@@ -49,11 +58,14 @@
                         output += `File: ${result.filename}\nOriginal:\n${result.original}\nRewritten:\n${result.rewritten}\n\n`;
                     });
                     outputDiv.textContent = output;
+                    console.log("Processing successful, output displayed.");
                 } else {
                     outputDiv.textContent = `Error: ${data.error || data.detail}`;
+                    console.error("Server returned an error:", data.error || data.detail);
                 }
             } catch (error) {
                 outputDiv.textContent = `Error: ${error.message}`;
+                console.error("Fetch error:", error.message);
             }
         }
     </script>
