@@ -26,13 +26,6 @@
             outputDiv.textContent = "Processing...";
             console.log("Starting rewrite process...");
 
-            if (files.length === 0) {
-                outputDiv.textContent = "Please upload at least one file.";
-                console.error("No files uploaded.");
-                return;
-            }
-
-            // Log the prompt and file details
             console.log("Prompt:", prompt || "Default prompt used");
             console.log("Files selected:", Array.from(files).map(f => f.name));
 
@@ -48,23 +41,26 @@
                     method: "POST",
                     body: formData
                 });
-
                 const data = await response.json();
                 console.log("Response received:", data);
 
-                if (response.ok) {
-                    let output = "";
+                let output = "";
+                if (data.error) {
+                    output = `Error: ${data.error}`;
+                    console.error("Server error:", data.error);
+                } else if (data.results) {
                     data.results.forEach(result => {
-                        output += `File: ${result.filename}\nOriginal:\n${result.original}\nRewritten:\n${result.rewritten}\n\n`;
+                        if (result.error) {
+                            output += `File: ${result.filename}\nError: ${result.error}\n\n`;
+                        } else {
+                            output += `File: ${result.filename}\nOriginal:\n${result.original}\nRewritten:\n${result.rewritten}\n\n`;
+                        }
                     });
-                    outputDiv.textContent = output;
                     console.log("Processing successful, output displayed.");
-                } else {
-                    outputDiv.textContent = `Error: ${data.error || data.detail}`;
-                    console.error("Server returned an error:", data.error || data.detail);
                 }
+                outputDiv.textContent = output;
             } catch (error) {
-                outputDiv.textContent = `Error: ${error.message}`;
+                outputDiv.textContent = `Fetch error: ${error.message}`;
                 console.error("Fetch error:", error.message);
             }
         }
