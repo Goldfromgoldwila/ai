@@ -6,22 +6,19 @@ from typing import List
 import logging
 import asyncio
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allow all for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load model
 try:
     logger.info("Loading tokenizer...")
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small")
@@ -47,10 +44,14 @@ async def rewrite_code(
     
     if not files:
         logger.warning("No files uploaded")
-        return {"error": "No files uploaded"}
+        response = {"error": "No files uploaded"}
+        logger.info(f"Sending response: {response}")
+        return response
     if model is None:
         logger.error("Model is not loaded")
-        return {"error": "Model failed to load, service unavailable"}
+        response = {"error": "Model failed to load, service unavailable"}
+        logger.info(f"Sending response: {response}")
+        return response
 
     results = []
     for file in files:
@@ -63,7 +64,6 @@ async def rewrite_code(
             inputs = tokenizer(input_with_prompt, return_tensors="pt", max_length=512, truncation=True).to(device)
             logger.info(f"Tokenized input for {file.filename}, tokens: {inputs['input_ids'].shape}")
 
-            # Run inference with timeout (10 seconds)
             async def generate_with_timeout():
                 return await asyncio.to_thread(model.generate, 
                     inputs["input_ids"],
@@ -83,8 +83,9 @@ async def rewrite_code(
             logger.error(f"Error processing {file.filename}: {str(e)}")
             results.append({"filename": file.filename, "error": str(e)})
 
-    logger.info(f"Returning results: {len(results)} files processed")
-    return {"results": results}
+    response = {"results": results}
+    logger.info(f"Sending response: {response}")
+    return response
 
 @app.get("/")
 async def root():

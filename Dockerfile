@@ -2,16 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system dependencies (cached unless changed)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (cache this layer unless requirements.txt changes)
+# Copy requirements first (cached unless requirements.txt changes)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code (changes more often, so last)
+# Copy app code (changes often, so last)
 COPY app.py .
 
 EXPOSE 8080
