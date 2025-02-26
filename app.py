@@ -5,15 +5,13 @@ import torch
 from typing import List, Optional
 import logging
 import asyncio
-import psutil  # For memory logging
+import psutil
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +21,6 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# Load model
 try:
     logger.info("Loading tokenizer...")
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small")
@@ -43,7 +40,7 @@ except Exception as e:
 @app.post("/rewrite")
 async def rewrite_code(
     prompt: str = Form("Rewrite this Java code for Minecraft 1.20.1 compatibility: "),
-    files: Optional[List[UploadFile]] = None  # Files are optional
+    files: Optional[List[UploadFile]] = None
 ):
     logger.info(f"Received request with prompt: '{prompt}', files: {[f.filename if f else None for f in files] if files else 'None'}")
     
@@ -55,23 +52,31 @@ async def rewrite_code(
 
     results = []
     
-    # Handle case with no files (process prompt alone)
     if not files:
         try:
-            logger.info(f"Processing prompt alone, input length: {len(prompt)}")
-            inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True).to(device)
-            logger.info(f"Tokenized prompt, tokens: {inputs['input_ids'].shape}")
+            prompt_lower = prompt.lower().strip()
+            if "hello" in prompt_lower or "helo" in prompt_lower:
+                rewritten = "Hello! I can analyze or rewrite Minecraft mod code—upload a Java file to get started!"
+            elif "what can you do" in prompt_lower:
+                rewritten = "I can analyze Java code for Minecraft mods, rewrite it for compatibility (e.g., 1.20.1), or suggest fixes. Try 'fix this code' with a file!"
+            elif "fix" in prompt_lower or "code" in prompt_lower:
+                rewritten = "Please upload a Java file for me to fix or analyze for Minecraft compatibility."
+            else:
+                logger.info(f"Processing prompt alone, input length: {len(prompt)}")
+                inputs = tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True).to(device)
+                logger.info(f"Tokenized prompt, tokens: {inputs['input_ids'].shape}")
 
-            async def generate_with_timeout():
-                return await asyncio.to_thread(model.generate, 
-                    inputs["input_ids"],
-                    max_length=512,
-                    num_beams=1,
-                    early_stopping=True
-                )
+                async def generate_with_timeout():
+                    return await asyncio.to_thread(model.generate, 
+                        inputs["input_ids"],
+                        max_length=512,
+                        num_beams=2,  # Increase for better output quality
+                        early_stopping=False  # Disable for single beam
+                    )
+                
+                outputs = await asyncio.wait_for(generate_with_timeout(), timeout=30.0)
+                rewritten = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
-            outputs = await asyncio.wait_for(generate_with_timeout(), timeout=30.0)
-            rewritten = tokenizer.decode(outputs[0], skip_special_tokens=True)
             logger.info(f"Processed prompt successfully, output length: {len(rewritten)}")
             results.append({"prompt": prompt, "rewritten": rewritten})
         except asyncio.TimeoutError:
@@ -81,12 +86,11 @@ async def rewrite_code(
             logger.error(f"Error processing prompt: {str(e)}")
             results.append({"prompt": prompt, "error": str(e)})
     else:
-        # Handle files if provided
         for file in files:
             try:
                 content = await file.read()
                 input_code = content.decode("utf-8")
-                input_with_prompt = prompt + input_code
+                input_with_prompt = prompt + "\n" + input_code
                 logger.info(f"Processing file: {file.filename}, input length: {len(input_with_prompt)}")
 
                 inputs = tokenizer(input_with_prompt, return_tensors="pt", max_length=512, truncation=True).to(device)
@@ -98,11 +102,11 @@ async def rewrite_code(
                     return await asyncio.to_thread(model.generate, 
                         inputs["input_ids"],
                         max_length=512,
-                        num_beams=1,
-                        early_stopping=True
+                        num_beams=2,  # Improve quality
+                        early_stopping=False
                     )
                 
-                outputs = await asyncio.wait_for(generate_with_timeout(), timeout=30.0)
+                outputs = await asyncio.wait_for(generate_with_timeout(), timeout=60.0)
                 rewritten = tokenizer.decode(outputs[0], skip_special_tokens=True)
                 logger.info(f"Processed {file.filename} successfully, output length: {len(rewritten)}")
                 results.append({"filename": file.filename, "original": input_code, "rewritten": rewritten})
