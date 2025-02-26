@@ -4,6 +4,7 @@ from transformers import RobertaTokenizer, T5ForConditionalGeneration
 import torch
 from typing import List
 import logging
+import asyncio
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -14,21 +15,21 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load model without quantization
+# Load model
 try:
     logger.info("Loading tokenizer...")
     tokenizer = RobertaTokenizer.from_pretrained("Salesforce/codet5-small")
     logger.info("Loading model 'Salesforce/codet5-small'...")
     model = T5ForConditionalGeneration.from_pretrained(
         "Salesforce/codet5-small",
-        torch_dtype=torch.float16,  # Half-precision to save memory
-        device_map="auto"  # CPU-only
+        torch_dtype=torch.float16,
+        device_map="auto"
     )
     device = torch.device("cpu")
     model.to(device)
@@ -62,15 +63,22 @@ async def rewrite_code(
             inputs = tokenizer(input_with_prompt, return_tensors="pt", max_length=512, truncation=True).to(device)
             logger.info(f"Tokenized input for {file.filename}, tokens: {inputs['input_ids'].shape}")
 
-            outputs = model.generate(
-                inputs["input_ids"],
-                max_length=512,
-                num_beams=1,  # Reduce beams to minimize memory
-                early_stopping=True
-            )
+            # Run inference with timeout (10 seconds)
+            async def generate_with_timeout():
+                return await asyncio.to_thread(model.generate, 
+                    inputs["input_ids"],
+                    max_length=512,
+                    num_beams=1,
+                    early_stopping=True
+                )
+            
+            outputs = await asyncio.wait_for(generate_with_timeout(), timeout=10.0)
             rewritten = tokenizer.decode(outputs[0], skip_special_tokens=True)
             logger.info(f"Processed {file.filename} successfully, output length: {len(rewritten)}")
             results.append({"filename": file.filename, "original": input_code, "rewritten": rewritten})
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout processing {file.filename}")
+            results.append({"filename": file.filename, "error": "Processing timed out"})
         except Exception as e:
             logger.error(f"Error processing {file.filename}: {str(e)}")
             results.append({"filename": file.filename, "error": str(e)})
