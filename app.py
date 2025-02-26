@@ -1,14 +1,23 @@
 from fastapi import FastAPI, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
 from transformers import RobertaTokenizer, T5ForConditionalGeneration
 import torch
 from typing import List
 import logging
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (adjust for production)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load model without quantization
 try:
@@ -17,9 +26,8 @@ try:
     logger.info("Loading model 'Salesforce/codet5-small'...")
     model = T5ForConditionalGeneration.from_pretrained(
         "Salesforce/codet5-small",
-        torch_dtype=torch.float16,  # Half-precision to save memory
-        # Removed load_in_8bit=True - no GPU available
-        device_map="auto"  # CPU-only
+        torch_dtype=torch.float16,
+        device_map="auto"
     )
     device = torch.device("cpu")
     model.to(device)
